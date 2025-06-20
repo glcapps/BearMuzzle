@@ -1,5 +1,153 @@
 
-# BearMuzzle
+A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM during inference — for real-time steering, behavioral shaping, or stylistic control without modifying the base model.
+
+### 🧩 Concepts Used
+
+BearMuzzle modulates the behavior of a large language model (LLM) by manipulating the **logits** — the raw scores the LLM assigns to each possible next token before sampling.
+
+#### What Is a Logit?
+
+A *logit* is a raw, unnormalized score representing the model’s preference for a specific token. At each step of generation:
+
+- The model computes a logit for every token in its vocabulary.
+- These logits are passed through a softmax function to become probabilities.
+- The higher the logit, the more likely that token will be selected.
+
+#### What Is a Logit Penalty?
+
+BearMuzzle applies a **logit penalty vector** to steer the model:
+
+- This vector has one value per token in the vocabulary.
+- Each value is a non-negative number subtracted from the corresponding token's logit.
+- The higher the penalty, the more that token is discouraged — but not forbidden.
+
+This technique allows nuanced control:
+- A penalty of `0.0` leaves the token untouched.
+- A penalty of `0.2` subtly reduces the token’s chance.
+- A penalty of `5.0` heavily discourages the token.
+- Unlike hard masks, the token is still available, allowing for more fluent and flexible generation.
+
+This **logit attenuation** approach enables BearMuzzle to shape style, tone, and behavior dynamically without modifying the base model or prompt.
+
+---
+
+### 🧠 Core Concepts and Mechanics
+
+This section explains key mechanisms used in BearMuzzle for readers unfamiliar with logit manipulation and lightweight companion models.
+
+---
+
+#### 1. Logit Penalty and Attenuation vs Masking
+
+- A *logit* is the raw score before softmax.
+- BearMuzzle subtracts a penalty from selected logits to reduce their sampling probability.
+- Unlike hard masks (which set logits to `-inf`), attenuation keeps the token available — just less likely.
+- Think of it like dimming a light rather than switching it off.
+
+---
+
+#### 2. Penalty Vector Composition
+
+BearMuzzle may combine multiple penalty vectors (e.g., tone, safety, domain) using:
+
+- **Summation**: Adds each vector element-wise.
+- **Max Aggregation**: Uses the strongest penalty per token.
+- **Weighted Fusion**: Scales and sums different behaviors.
+
+Example:
+
+Tone Penalty: `[0.1, 0.0, 0.3]`  
+Safety Penalty: `[0.0, 0.5, 0.1]`
+
+- Summation: `[0.1, 0.5, 0.4]`
+- Max: `[0.1, 0.5, 0.3]`
+
+---
+
+#### 3. Delta Logit Dataset Construction
+
+To train a sidekick model:
+
+- Run LLM twice: once with a behavioral prefix, once without.
+- Record the logits for the same prompt/output.
+- Compute the *difference* (delta) between the two outputs per token.
+
+Example:
+
+- Logits without prefix: `[1.5, 0.3]`
+- Logits with prefix: `[1.0, 0.8]`
+- Delta: `[-0.5, +0.5]`
+
+This teaches BearMuzzle how the prefix modifies output behavior.
+
+---
+
+#### 4. Forced Token Emission / Injection
+
+BearMuzzle can inject tokens (e.g., "In summary,") before resuming standard generation by:
+
+- Setting the desired token’s logit high (or others to `-inf`) at that step.
+- Softmax ensures the forced token is selected.
+
+This maintains continuity in the sampling loop, without re-encoding the full context.
+
+---
+
+#### 5. Streaming and Time-to-First-Token
+
+Why BearMuzzle avoids latency:
+
+- Prefixing a prompt adds re-tokenization and warmup costs.
+- BearMuzzle steers behavior *post-context*, avoiding changes to the original prompt.
+- It computes penalties incrementally as tokens are generated.
+
+---
+
+#### 6. Ternary Weights vs Ternary Activations
+
+- **Ternary Weights**: Model parameters use values from {-1, 0, +1}, allowing extreme compression (~1.58 bits).
+- **Ternary Activations**: Intermediate neuron outputs also restricted to ternary values.
+- BearMuzzle mostly assumes ternary weights, which are easier to optimize and compress.
+
+---
+
+#### 7. Context Matching and Tokenizer Fidelity
+
+BearMuzzle and the main LLM must use the *exact same tokenizer*.
+
+- If token IDs mismatch, the penalty will apply to the wrong token.
+- Example: If "hello" is one token in the main model, but two ("he", "llo") in BearMuzzle, the steering breaks.
+
+---
+
+#### 8. Sparse vs Dense Penalty Vectors
+
+- **Sparse**: Only a few token IDs receive non-zero penalties.
+- **Dense**: All tokens are adjusted.
+
+Sparse vectors are faster and consume less memory — ideal for real-time applications.
+
+---
+
+#### 9. Gradient Accumulation (for Low-Memory Training)
+
+When batch size is too small for good gradients:
+
+- Accumulate gradients over multiple mini-batches.
+- Perform one optimizer step every N batches.
+
+This simulates large batches on devices with limited RAM (e.g., 16GB Mac Mini).
+
+---
+
+#### 10. Logit Bias vs Logit Attenuation
+
+OpenAI’s `logit_bias` applies static, fixed adjustments.
+
+- BearMuzzle is dynamic — it computes penalties based on full context and output prefix at every generation step.
+- More adaptive, fluent, and task-specific.
+
+---
 A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM during inference — for real-time steering, behavioral shaping, or stylistic control without modifying the base model.
 
 🗺️ High-Level Architecture
@@ -379,6 +527,30 @@ These can be composed to produce a blended penalty vector that captures multiple
 BearMuzzle's compositional capability is particularly powerful in dynamic environments where task boundaries blur — such as multi-agent systems, open-ended assistants, or adaptive storytelling — allowing real-time interpolation between behavioral modes without hard transitions or re-prompts.
 This flexibility enables dynamic context interpretation, such as progressively increasing the influence of a safety layer as the conversation veers into sensitive topics, or dialed modulation of tone as user mood shifts — all without restarting the inference loop.
 Another direction involves reactive shaping — where BearMuzzle monitors generated output in real time and adjusts its attenuation strategy based on token-level trends or user feedback. For instance, if the generated text starts drifting off-topic, BearMuzzle could increase penalties for tangential branches or re-weight the original task signal. This creates a feedback loop that helps maintain alignment in evolving or ambiguous prompts.
+
+---
+
+#### 12. 🧬 Simulated Persona Merging
+
+BearMuzzle enables multiple behavior-altering penalty vectors to be blended in real time, enabling composite personas.
+
+Example scenario:
+
+- **Tone Penalty Vector**: discourages aggressive or curt phrasing.
+- **Safety Penalty Vector**: suppresses risky or inappropriate tokens.
+- **Domain Penalty Vector**: promotes technical or field-specific vocabulary.
+
+These vectors are combined using a weighted strategy:
+
+```python
+final_penalty = 0.5 * tone + 0.3 * safety + 0.2 * domain
+```
+
+This allows rich behavior synthesis. For example:
+
+> “Respond like a helpful attorney with medical caution and polite tone.”
+
+By adjusting weights dynamically, BearMuzzle can support fluid shifts in style and alignment without interrupting inference.
 
 ---
 
