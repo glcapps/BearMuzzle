@@ -153,27 +153,39 @@ A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM
 🗺️ High-Level Architecture
 
 ```
-+------------------------+          +--------------------+
-|    Input Context       |          |    Output Prefix   |
-+------------------------+          +--------------------+
-            |                               |
-            |                               |
-            v                               v
-     +-----------------------------------------------+
-     |           🧠 BearMuzzle (CPU-side LLM)         |
-     |-----------------------------------------------|
-     | - Processes full context and output so far     |
-     | - Outputs logit attenuation vector             |
-     +-------------------------+---------------------+
-                               |
-                               v
-     +----------------------------------------------+
-     |   🎯 Primary LLM (GPU-based, e.g. llama.cpp)   |
-     |----------------------------------------------|
-     | - Receives input context                      |
-     | - Applies logit penalties from BearMuzzle     |
-     | - Samples or decodes next token               |
-     +----------------------------------------------+
++----------------------+              +------------------------+
+|                      |  Token N     |                        |
+|     Main LLM         | -----------> |     Raw Logits         |
+|    (GPU / llama.cpp) |              |   [51200 floats]       |
+|                      |              +------------------------+
+|                      |                         |
+|                      |                         v
+|                      |             +------------------------+
+|                      |             |                        |
+|                      |             |   BearMuzzle Sidekick  |
+|                      |             |      (CPU, 1.5-bit)    |
+|                      |             |                        |
+|                      |             |   • Observes context    |
+|                      |             |   • Computes bias mask  |
+|                      |             |   • May trigger forced  |
+|                      |             |     phrase injection    |
+|                      |             +------------------------+
+|                      |                         |
+|                      |                         v
+|                      |             +------------------------+
+|                      |             |                        |
+|                      |             |   Logit Adjuster       |
+|                      |             |   (masking, biasing,   |
+|                      |             |    forced tokens)      |
+|                      |             |                        |
+|                      |             +------------------------+
+|                      |                         |
+|                      |      Adjusted Logits    v
+|                      |              +------------------------+
+|                      |              |                        |
+|                      | <----------- | Token N+1 Selection    |
+|                      |              |                        |
++----------------------+              +------------------------+
 ```
 
 This visual captures the flow between the two models and how logit guidance is applied.
