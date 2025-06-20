@@ -603,3 +603,85 @@ Tips:
 - Checkpoint frequently to allow for restarts
 
 This enables solo developers to build viable BearMuzzle models on consumer hardware.
+---
+
+### 🧪 Related Work and Research Alignment
+
+Recent research in the field of LLM steering has explored concepts similar to BearMuzzle’s logit modulation approach. These works validate the design direction and highlight BearMuzzle’s unique external and token-level strategy.
+
+#### 🟢 [Guiding Giants: Lightweight Controllers for Weighted Activation Steering in LLMs](https://arxiv.org/abs/2505.20309)
+This paper introduces compact controller networks that modify internal activations using layer-wise scaling to steer model behavior.
+
+- **Similarity**: Uses lightweight, real-time control without altering the base model weights.
+- **Difference**: Operates on hidden layer activations instead of final logits.
+- **Relevance**: Demonstrates the feasibility of external alignment using auxiliary modules.
+
+#### 🟢 [Steering Large Language Models with Feature-Guided Activation Additions](https://arxiv.org/abs/2305.10967)
+FGAA uses sparse, interpretable activation modifications derived from autoencoder-encoded features to steer output.
+
+- **Similarity**: Uses structured, interpretable vectors to guide output behavior.
+- **Difference**: Targets activations, not logits; focuses on inner-state perturbation.
+- **Relevance**: Supports the notion that behavioral deltas can be encoded as lightweight overlays.
+
+#### 🟢 [Identifiable Steering via Sparse Autoencoding of Multi-Concept Shifts](https://arxiv.org/abs/2306.17045)
+This work identifies steering vectors using sparse autoencoders to capture and inject multiple aligned behavioral concepts.
+
+- **Similarity**: Supports composable alignment vectors to modulate style or tone.
+- **Difference**: Operates in the activation space; requires separate encoder/decoder training.
+- **Relevance**: Suggests sparse vector fields can encode domain-specific behavior cues.
+
+#### 🟢 [Steering Large Language Models Using Conceptors](https://arxiv.org/abs/2402.09691)
+Applies conceptor matrices to project activations into aligned subspaces—representing constraints like helpfulness or harmlessness.
+
+- **Similarity**: Supports real-time, modular steering without model retraining.
+- **Difference**: Uses linear algebraic projection; focused on high-level behaviors.
+- **Relevance**: Shows behavioral priors can be enforced at runtime through lightweight overlays.
+
+#### 🟢 [ExpertSteer: Expert Model Alignment Control via Intermediate Fusion](https://arxiv.org/abs/2404.03929)
+Proposes combining multiple smaller "expert" models via fusion layers to shape LLM behavior mid-inference.
+
+- **Similarity**: Uses external models to steer generation dynamically.
+- **Difference**: Requires fusion interfaces and internal access; not logit-targeted.
+- **Relevance**: Supports the trend of distributed, modular influence during inference.
+
+---
+
+
+BearMuzzle remains unique in that it:
+- Acts externally at the logit level.
+- Works with quantized or CPU-executable "sidekick" models.
+- Requires no access to hidden states or model retraining.
+
+---
+
+### 🧭 Comparison Table: BearMuzzle vs. Activation-Based Steering
+
+| Feature                     | BearMuzzle                                  | Related Works                           |
+|----------------------------|---------------------------------------------|-----------------------------------------|
+| **Manipulation Level**     | Logit-level attenuation/injection           | Latent activations / hidden layers      |
+| **Runtime Overhead**       | Lightweight CPU-sidekick (quantized)        | Lightweight controller nets             |
+| **Training Inputs**        | Delta logits between prefix/no-prefix       | Concept-encoded activations             |
+| **Composability**          | Designed for multi-vector blending          | Usually discrete concept embeddings     |
+| **Hardware Requirements**  | Minimal, CPU-executable                     | Often GPU-optimized                     |
+| **Integration Layer**      | External to model inference loop            | Often requires access to model internals|
+
+---
+
+### 📌 Additional Implications
+
+- **No llama.cpp Modifications Required**:  
+  BearMuzzle interacts with existing APIs such as logit biasing or forced token sequences, requiring no patching of llama.cpp internals.
+
+- **Decoupled Development**:  
+  Because the penalty vectors are trained externally, BearMuzzle models can evolve independently from the LLM they steer—provided the tokenization schema is shared.
+
+- **Cross-Model Applicability**:
+BearMuzzle sidekick models can be trained on drastically smaller or highly quantized versions of a given LLM and later applied to larger or more accurate models of the same architecture. As long as the token vocabulary and inference APIs remain consistent, this approach allows for low-cost, scalable training with generalization across model tiers and future generations.
+
+- **Immediate Integration**:  
+  Penalty overlays can be swapped in or out mid-inference without reinitializing or recompiling the base model.
+
+- **Stackable Steering**:  
+  This logit-layer mechanism can operate alongside activation-based controllers, supporting hybrid modulation pipelines.
+
+---
