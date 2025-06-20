@@ -141,6 +141,48 @@ Architectural Options:
 	•	Shallow RNN or GRU with binary weights
 	•	Token-attention MLP trained for penalty regression
 
+⚡ Why 1.5-bit Models Are CPU-Friendly
+
+The use of ternary weights (values -1, 0, or +1) is not only memory-efficient — it also leads to significantly faster inference on general-purpose CPUs. Here's why:
+
+- **Multiplication-Free Math**: Instead of floating-point operations, matrix multiplications become additions, subtractions, or skips (for zeroes). This reduces instruction overhead and energy consumption.
+- **Cache and Bandwidth Efficiency**: With fewer bits per parameter (1.58 bits vs. 8+), more weights fit into CPU caches, reducing memory bottlenecks — a major factor for CPU-bound inference.
+- **Simplified Kernels**: Inference kernels can use integer math and even bitwise operations to pack and process ternary matrices efficiently. This aligns well with SIMD instruction sets (AVX, NEON).
+- **On-the-Fly Decoding**: Packed ternary representations compress well, enabling fast loading and decoding at runtime — helpful for on-device or edge deployment.
+
+These benefits make ternary LLMs a practical match for sidecar models like BearMuzzle, where real-time performance must be achieved using CPU resources alone.
+
+📦 Memory Advantages of 1.5-bit Models
+
+Ternary quantization (1.58 bits per parameter) yields substantial memory-related benefits, making it ideal for low-resource and edge inference:
+
+- **Drastically Smaller Model Size**: A 100M parameter model fits in ~20MB, compared to ~400MB for float32. This makes on-device or embedded deployment practical.
+- **Better Cache Utilization**: More parameters fit into CPU L1/L2 cache lines, reducing memory latency and boosting throughput — especially important on CPUs without specialized matrix hardware.
+- **Efficient Bandwidth Usage**: Lower memory footprint translates to fewer memory fetches, improving inference speed on memory-bound systems.
+- **Multi-Model Hosting**: With compact representations, several behavior-specific models can coexist in RAM, enabling fast runtime switching or ensemble shaping.
+- **Streamable and Compressed**: Models can be stored in compressed formats with near-zero overhead, aiding container-based or mobile deployment scenarios.
+
+These memory savings compound the compute efficiency gains to make 1.5-bit ternary models an ideal sidekick for real-time logit modulation on CPU-bound systems.
+
+🔍 Precision Notes on Intermediary Layers
+
+While BearMuzzle uses 1.58-bit ternary quantization for model weights, the bit depth of intermediary computations — such as activations, attention scores, and normalization outputs — can vary and may influence both runtime speed and precision.
+
+✅ Current Practice:
+- **Weights**: Stored as ternary values (-1, 0, +1), using ~1.58 bits per parameter.
+- **Activations**: Typically computed in int8, int4, or float16.
+- **Attention and Norm Ops**: May require float16 or float32 temporarily due to softmax or residual scaling operations.
+
+This hybrid-precision approach balances efficiency and model fidelity:
+- Low bit-width activations reduce RAM usage and improve matrix op speed.
+- Mixed precision preserves expressive power where needed.
+
+🧪 Potential Optimizations:
+- Explore ternary activations or integer-only attention for even leaner inference loops.
+- Support selectable quantization tiers (e.g., "low-latency", "balanced", "high-precision") to match application constraints.
+
+🧠 Why It Matters:
+Even when weights are compact, intermediary values dominate the working memory during inference. Lowering activation precision helps maintain speed and memory efficiency, particularly for real-time inference on CPU.
 Memory Considerations
 
 Memory usage is not strictly limited to <100MB, but minimal memory footprint is a target for wide deployment. A tiered design allows for:
