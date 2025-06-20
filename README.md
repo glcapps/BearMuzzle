@@ -1060,3 +1060,41 @@ When paired with BearMuzzle's post-inference cleanup layer:
 - Policy recommendation systems that think aloud
 
 This structure allows BearMuzzle to simulate "thinking" behavior in local models, making the output more explainable, structured, and aligned with advanced prompting strategies.
+
+
+---
+
+## 🧰 Development Strategy: Python + Rust
+
+BearMuzzle is structured for agile research with a stable deployment path:
+
+### Phase 1: Python for Prototyping
+
+We use `llama-cpp-python` to:
+
+- Rapidly experiment with sidekick masking loops
+- Validate logit shaping and prefix injection
+- Iterate on integration with tool-use or linter feedback
+
+This allows for quick testing and evaluation before deeper optimization.
+
+### Phase 2: Rust for Implementation
+
+We will implement the final system in Rust using:
+
+- Direct FFI access to `llama.cpp`
+- Custom inference loops with exposed logits
+- Efficient multi-threaded coordination (main + sidekick models)
+- CPU-first runtime performance and lightweight deployment
+
+This approach ensures high portability, low latency, and robust resource control.
+
+### 🧬 Python Bindings from Rust
+
+The Rust implementation will expose bindings using tools like `pyo3` or `maturin`, enabling:
+
+- Python access to Rust-accelerated inference loops
+- Drop-in compatibility with `llama-cpp-python`
+- A smooth bridge between research code and production logic
+
+This layered architecture allows researchers, builders, and embedded system engineers to collaborate without friction.
