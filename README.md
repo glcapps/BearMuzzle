@@ -188,36 +188,6 @@ A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM
 +----------------------+              +------------------------+
 ```
 
-```mermaid
-flowchart TD
-  A[Token History + Prompt]
-  B[Main LLM\n(GPU)]
-  C[BearMuzzle Sidekick\n(CPU)]
-  D[Raw Logits]
-  E[Logit Adjustments\n(bias / mask / injection)]
-  F[Adjusted Logits]
-  G{Token Sampling\n(Next Token)}
-  H[Output Buffer]
-  I[Insert Forced Phrase]
-  J[Mark Position for\nLater Removal]
-
-  A --> B
-  A --> C
-  B --> D
-  C --> E
-  D --> F
-  E --> F
-  F --> G
-  G --> H
-  G --> I
-  I --> J
-  J --> H
-
-  subgraph Optional Injection
-    I
-    J
-  end
-```
 This visual captures the flow between the two models and how logit guidance is applied.
 
 
@@ -572,6 +542,31 @@ Another direction involves reactive shaping — where BearMuzzle monitors genera
 
 ---
 
+### 🔄 Learned Steering from Linter Feedback
+
+BearMuzzle’s linter integration does more than respond after mistakes — it can anticipate and actively shape generation patterns.
+
+The sidekick model observes linter warnings over the course of inference. If similar mistakes recur (e.g., `== None`, mutable default arguments), it can begin to apply logit penalties to problematic tokens and slight boosts to preferred alternatives. This transforms BearMuzzle from a post-hoc annotator into a real-time behavioral coach.
+
+#### 🧠 Example
+
+**Without Steering:**
+```python
+def foo(bar={}):
+    # ⚠️ Avoid mutable default arguments
+```
+
+**With Steering (later in same session):**
+```python
+def foo(bar=None):  # (no linter warning needed)
+```
+
+The sidekick has learned to steer away from patterns that previously triggered corrective comments. This anticipatory biasing reinforces good coding habits without altering the core model.
+
+Such behavior can be trained offline using context+code pairs with and without feedback prompts, forming a lightweight habit-shaping loop that improves output across longer sessions.
+
+---
+
 #### 12. 🧬 Simulated Persona Merging
 
 BearMuzzle enables multiple behavior-altering penalty vectors to be blended in real time, enabling composite personas.
@@ -768,6 +763,7 @@ The following ideas expand BearMuzzle’s capabilities by leveraging existing in
 - **Interrupt-Aware Smoothing**  
   When running in streamed environments, steer generation toward natural stopping points in anticipation of possible interruption.
 
+
 ### 🔧 Meta-Control Extensions
 
 - **User-Controlled Persona Blending**  
@@ -775,3 +771,137 @@ The following ideas expand BearMuzzle’s capabilities by leveraging existing in
 
 - **Adaptive Penalty Switching**  
   Replace or blend sidekick models or penalty overlays at runtime in response to detected dialogue phases or external events.
+
+---
+
+## 🧰 Tool Use and Feedback Integration
+
+BearMuzzle supports integration with tool-using LLM runtimes, enabling dynamic communication between the main LLM and the sidekick biasing model. This opens a powerful channel for both proactive and reactive inference shaping.
+
+### 🔄 Two-Way Interaction Model
+
+**1. LLM-Initiated Sidekick Control**
+
+The main model can explicitly invoke tools to update the sidekick’s behavior mid-inference. For example:
+
+```json
+{
+  "tool_call": {
+    "name": "adjust_bias",
+    "arguments": {
+      "discourage": ["eval", "exec"],
+      "encourage": ["safe_eval"]
+    }
+  }
+}
+```
+
+This allows dynamic logit penalty/boost configurations during runtime, scoped as needed.
+
+**2. Sidekick Reactivity to Tool Usage**
+
+The sidekick can observe emitted tokens and recognize tool use patterns (e.g., a `search_web` call or a `ChatCompletion` API invocation). It can then apply context-specific shaping:
+
+| Tool Used         | Sidekick Reaction                              |
+|------------------|--------------------------------------------------|
+| `search_web`     | Encourage synthesis-style phrasing               |
+| `summarize_text` | Boost structured output (bullet points, headers) |
+| `get_docstring`  | Inject reminders or format hints                 |
+| `check_style`    | Trigger stricter linter overlays                 |
+
+### 🛠️ Example Control Commands
+
+The following represent a conceptual API between the LLM and the sidekick:
+
+- `set_bias({token: weight})`
+- `inject_reminder(text)`
+- `learn_pattern({bad: good})`
+- `apply_preset("security")`
+- `scope_bias(N_tokens)`
+- `pause_masking()` / `resume_masking()`
+
+These can be implemented in any host framework that supports tool calls or plugin hooks.
+
+### 🔮 Future Work
+
+Planned capabilities include:
+- Sidekick awareness of user-defined modes (e.g. `"developer_tone"`, `"factual_only"`)
+- Bidirectional adapters for runtime frameworks like OpenAI Assistants, LangChain, and Semantic Kernel
+- Contextual policy enforcement layers (e.g., safety, verbosity, branding)
+
+BearMuzzle is positioned as a real-time shaping layer for inference behavior — modifiable by the main model itself.
+---
+
+## 🧹 Inference-Time Correction with Post-Hoc Cleanup
+
+BearMuzzle embraces the immutability of LLM token emission — and leverages it by introducing a correction flow that marks and repairs errors during inference while preserving a clean final output through post-processing.
+
+### 🔄 The Constraint
+
+In transformer-based LLMs, once a token is emitted, it **cannot be retracted or replaced**. Even if the model realizes it made a mistake mid-sentence, it must continue building from that token onward.
+
+### 🧠 BearMuzzle Strategy
+
+BearMuzzle sidekick model can intervene to:
+
+1. Allow the LLM to emit an incorrect or suboptimal line.
+2. Immediately follow up with a **forced error marker** (e.g., `# ❌ Logic error: comparison is always true`).
+3. Guide the LLM to emit a **corrected version** of the flawed line.
+4. Optionally bracket this region for post-inference cleanup.
+5. During final output, a simple transformation removes the flawed line and correction hint, preserving only the corrected content.
+
+This enables **regenerative correction** without breaking the inference loop.
+
+### 🧪 Example: Correcting a Code Snippet
+
+**During inference:**
+
+```python
+if x == None:
+    # ❌ Prefer 'is None' for comparison
+    if x is None:
+```
+
+**After cleanup:**
+
+```python
+if x is None:
+```
+
+This behavior mirrors how a human might revise code during typing — thinking out loud, marking flaws, and rephrasing — but produces a clean output at the end.
+
+### ⚙️ Cleanup Strategies
+
+Post-inference, the system can:
+
+- Detect lines starting with `# ❌` or custom markers.
+- Identify their adjacent correction block.
+- Remove both the flawed line and the hint.
+- Retain the corrected form only.
+
+This stage is entirely modular and can be configured per use case (e.g., preserve annotations for audit trails, strip for clean output, etc.).
+
+### 🛠️ Applications
+
+- LLM code generation with automatic rewrites
+- Context-aware error recovery without hallucination penalties
+- Editable audit trails in educational tools
+- Use in CI pipelines for formatting and correction
+
+### 🔍 Example Use Flow
+
+| Step | Output |
+|------|--------|
+| LLM emits flawed line | `if user == None:` |
+| Sidekick appends comment | `# ❌ Use 'is None' instead` |
+| Sidekick forces fix | `if user is None:` |
+| Post-pass strips old lines | Final: `if user is None:` |
+
+### 🔄 Why It Works
+
+This flow acknowledges that:
+- You can't undo a token.
+- But you can annotate, correct, and erase it after the fact.
+- All while keeping the LLM in its natural autoregressive loop.
+
+BearMuzzle turns this into a native feature, enabling **precise correction without hallucination or context restarts**.
