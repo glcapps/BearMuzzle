@@ -858,8 +858,8 @@ This enables **regenerative correction** without breaking the inference loop.
 
 ```python
 if x == None:
-    # ❌ Prefer 'is None' for comparison
-    if x is None:
+# ❌ Prefer 'is None' for comparison
+if x is None:
 ```
 
 **After cleanup:**
@@ -904,4 +904,31 @@ This flow acknowledges that:
 - But you can annotate, correct, and erase it after the fact.
 - All while keeping the LLM in its natural autoregressive loop.
 
-BearMuzzle turns this into a native feature, enabling **precise correction without hallucination or context restarts**.
+
+---
+
+### 📚 Connections to Speculative Decoding in LLM Inference
+
+BearMuzzle's post-hoc cleanup strategy echoes the mechanisms found in speculative decoding research. One such example is described in:
+
+> **LLM Inference Unveiled: Survey and Roofline Model Insights**  
+> [arXiv:2405.18080](https://arxiv.org/abs/2405.18080)
+
+This work explains how small "draft" models can generate tokens that are conditionally accepted or rejected by the main LLM:
+
+> "The small model can speculate and generate draft tokens ... Some of the tokens are rejected, so the large model asks the small model to ‘roll back’ these wrong tokens and resume speculating."
+
+This process aligns conceptually with BearMuzzle’s correction approach:
+- Allow potentially flawed tokens to be emitted.
+- Immediately flag them with error marker tokens or comments.
+- Force corrected versions to follow.
+- Strip marked spans after inference to produce a clean final result.
+
+#### ✅ Why This Matters
+
+- Validates BearMuzzle’s token-stream-respecting correction method.
+- Confirms feasibility of approximate-first, corrected-later inference.
+- Shows alignment with emerging efficiency paradigms like speculative decoding.
+- Provides an opportunity to benchmark correction accuracy vs. speculative draft acceptance rates.
+
+This enhances BearMuzzle’s conceptual grounding and connects it to active work in efficient LLM inference.
