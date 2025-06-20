@@ -1,5 +1,49 @@
 
+
 A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM during inference — for real-time steering, behavioral shaping, or stylistic control without modifying the base model.
+---
+
+## 🧰 Sidekick Runtime Implementation
+
+The sidekick model is designed to run in real time, in parallel with the main LLM's inference loop. It processes the same input context and outputs a logit adjustment vector or constrained token sequence at each inference step.
+
+To ensure responsiveness and low resource usage, the sidekick model is optimized for:
+
+- **CPU execution**
+- **Low memory footprint (<100MB)**
+- **1.58-bit (ternary) model weights** using values of {-1, 0, +1}
+
+This allows the sidekick to keep pace with the GPU-based main LLM, even on commodity hardware such as laptops or embedded servers.
+
+### 🧪 Preferred Runtime: `llama.cpp`
+
+We currently recommend using `llama.cpp` as the execution backend for both the sidekick and the main LLM:
+
+- ✅ Supports concurrent contexts (multi-threaded token-by-token inference)
+- ✅ Shared tokenizer and GGUF format for main and sidekick models
+- ✅ Built-in support for logit manipulation per token step
+- ✅ Extremely efficient on CPUs
+
+The sidekick model can be quantized into `Q2_K` or a ternary-simulating GGUF format and run in a dedicated CPU thread using `llama.cpp`.
+
+### 🧪 Other Runtime Options
+
+| Runtime         | Suitability | Notes |
+|------------------|------------|-------|
+| **ONNX Runtime** | 🟡 Possible | Custom ops required for ternary inference |
+| **tinygrad**     | 🔸 Experimental | Easily modifiable but slower |
+| **MLC-LLM**       | 🔸 Possible | TVM backend with future support potential |
+
+### 🧠 Why This Matters
+
+Running the sidekick on CPU ensures:
+
+- Full decoupling from GPU usage
+- Predictable timing and logit shaping
+- Real-time shaping of the next token's logit distribution before sampling
+
+The runtime choice is crucial to preserve responsiveness and portability, enabling the sidekick to function as a consistent inference-time controller regardless of where the main model is hosted.
+
 
 ### 🧩 Concepts Used
 
@@ -148,7 +192,7 @@ OpenAI’s `logit_bias` applies static, fixed adjustments.
 - More adaptive, fluent, and task-specific.
 
 ---
-A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM during inference — for real-time steering, behavioral shaping, or stylistic control without modifying the base model.
+
 
 🗺️ High-Level Architecture
 
@@ -417,12 +461,18 @@ Training Dataset Construction
 	•	If 10K prompts are used × 10 behaviors × 50 token generations = ~5 million labeled deltas
 	•	These runs can be parallelized, but compute-intensive
 
-Cost Impact (GPU-backed cloud or local training):
 
-Phase	Resource	Cost (est.)
-Data generation	700 GPU hours (A100)	~$350–$800
-Dataset storage	~5GB	Negligible
-BearMuzzle training	<10 GPU hours	~$10–$30 (or 3–14 days on M4-class device)
+## 💰 Training Cost Speculation (Example for Qwen 3-0.5B)
+
+Training a BearMuzzle-compatible sidekick model using Qwen 3-0.5B dramatically reduces compute and memory requirements while preserving compatibility with larger Qwen 3 models.
+
+- ✅ The model is just 0.5B parameters, making it suitable for training on modern laptops or Mac Mini-class devices.
+- 🧠 The full vocabulary and token output space is consistent across Qwen 3 family models, so training is transferable to Qwen 3-7B and 14B without remapping.
+- 🧪 Example batch sizes of 2–4 can be used with context windows of 2k–4k on machines with **16GB RAM**.
+- 🔁 Epoch throughput is rapid: thousands of examples can be cycled through in a few hours.
+- ⏱️ A sidekick model trained on 25k examples could be fine-tuned in **under 8 hours** on a Mac Mini (M4 or similar) or a 1× T4/A10G instance.
+
+This makes small-Qwen sidekicks extremely viable for rapid prototyping and usable production steering tools — not just experimental scaffolds.
 
 📝 Summary:
 	•	Training the BearMuzzle is relatively light
@@ -722,6 +772,26 @@ BearMuzzle sidekick models can be trained on drastically smaller or highly quant
   This logit-layer mechanism can operate alongside activation-based controllers, supporting hybrid modulation pipelines.
 
 ---
+
+---
+
+## 🧩 Sidekick Compatibility Matrix for Open Models
+
+This matrix summarizes compatibility between major open-weight LLM families and BearMuzzle-style sidekick inference control.
+
+| Model Family | Tokenizer Shared Across Sizes | Compatible with Sidekick Training at Small Scale | llama.cpp Inference Supported | Notes |
+|--------------|-------------------------------|--------------------------------------------------|-------------------------------|-------|
+| **Qwen 3**   | ✅ Yes                         | ✅ Yes                                           | 🟡 Partial (some patching needed) | Ideal candidate; consistent tokenizer and strong small models |
+| **LLaMA 2**  | ✅ Yes                         | ✅ Yes                                           | ✅ Yes                        | Most thoroughly supported in `llama.cpp`; baseline model for BearMuzzle |
+| **LLaMA 3**  | ✅ Yes                         | ✅ Yes                                           | ✅ Yes                        | Large context length models may require tuning sidekick context assumptions |
+| **Mistral**  | ✅ Yes                         | ✅ Yes                                           | ✅ Yes                        | Good choice; fast inference and stable quantized variants |
+| **Gemma**    | ✅ Yes                         | ✅ Yes                                           | 🟡 Partial                    | Limited community support; still promising |
+| **Falcon**   | 🔶 Unclear tokenizer consistency | 🔸 Uncertain                                     | 🔸 Less common in llama.cpp   | May require additional effort to align output token IDs |
+| **Command-R**| ❌ No (not open)               | ❌ No                                            | ❌ No                         | Not usable under BearMuzzle model without closed API access |
+
+---
+
+This compatibility table is updated as new open-weight families emerge or get `llama.cpp` support. All rows assume the use of shared tokenizer vocabularies and RoPE or ALiBi-compatible positional encodings for successful logit shaping.
 
 ---
 
