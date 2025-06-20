@@ -188,6 +188,36 @@ A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM
 +----------------------+              +------------------------+
 ```
 
+```mermaid
+flowchart TD
+  A([Token History + Prompt]) --> B(Main LLM<br/>(GPU))
+  A --> C(BearMuzzle Sidekick<br/>(CPU))
+  B --> D[Raw Logits]
+  C --> E[Logit Adjustments<br/>(bias/mask/injection)]
+
+  D --> F[Adjusted Logits]
+  E --> F
+
+  F --> G{Token Sampling<br/>(Next Token)}
+  G --> H[Output Buffer]
+
+  subgraph Optional Injection
+    I[Insert Forced Phrase] --> J[Mark Position for Later Removal]
+  end
+
+  G --> I
+  J --> H
+
+  style B fill:#fdf6e3,stroke:#b58900,stroke-width:2px
+  style C fill:#e6f7ff,stroke:#268bd2,stroke-width:2px
+  style D fill:#eee
+  style E fill:#eee
+  style F fill:#eee
+  style G fill:#fff,stroke:#999,stroke-width:1px
+  style H fill:#d7ffd7,stroke:#2e7d32,stroke-width:2px
+  style I fill:#fce4ec,stroke:#ad1457,stroke-dasharray: 5 5
+  style J fill:#fce4ec,stroke:#ad1457,stroke-dasharray: 5 5
+```
 This visual captures the flow between the two models and how logit guidance is applied.
 
 
