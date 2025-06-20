@@ -190,19 +190,19 @@ A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM
 
 ```mermaid
 flowchart TD
-  A([Token History + Prompt]) --> B(Main LLM<br/>(GPU))
-  A --> C(BearMuzzle Sidekick<br/>(CPU))
+  A([Token History + Prompt]) --> B(Main LLM\n(GPU))
+  A --> C(BearMuzzle Sidekick\n(CPU))
   B --> D[Raw Logits]
-  C --> E[Logit Adjustments<br/>(bias/mask/injection)]
+  C --> E[Logit Adjustments\n(bias / mask / injection)]
 
   D --> F[Adjusted Logits]
   E --> F
 
-  F --> G{Token Sampling<br/>(Next Token)}
+  F --> G{Token Sampling\n(Next Token)}
   G --> H[Output Buffer]
 
   subgraph Optional Injection
-    I[Insert Forced Phrase] --> J[Mark Position for Later Removal]
+    I[Insert Forced Phrase] --> J[Mark Position for\nLater Removal]
   end
 
   G --> I
