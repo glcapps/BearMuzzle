@@ -685,3 +685,51 @@ BearMuzzle sidekick models can be trained on drastically smaller or highly quant
   This logit-layer mechanism can operate alongside activation-based controllers, supporting hybrid modulation pipelines.
 
 ---
+
+---
+
+## 🧭 Phase Two Development Prospects
+
+The following ideas expand BearMuzzle’s capabilities by leveraging existing infrastructure—namely, the logit manipulation hook, external sidekick model, and runtime integration through llama.cpp’s token loop. None of these require internal modification to the main model.
+
+### 🔄 Real-Time Modulation Enhancements
+
+- **Drift Detection**  
+  Detect deviation from intended tone, domain, or persona and dynamically suppress off-topic or irrelevant token groups.
+
+- **Context-Aware Ending Bias**  
+  Steer generation toward punctuation or semantic closure when nearing a logical wrap-up phase.
+
+- **Soft Reminder Phrase Injection**  
+  Insert a predetermined phrase mid-sequence without blocking or introducing delay, and mark it for post-removal. Useful for safety, disclaimers, or reframing prompts.
+
+- **Stochasticity Damping in Sensitive Contexts**  
+  Identify emotionally charged or safety-critical zones and reduce output entropy through logit scaling.
+
+- **Topic Boundary Detection**  
+  Recognize when a topic shift occurs and softly bias toward transitional phrases (e.g., “Next, let’s...” or “To summarize…”).
+
+### 🧠 Structure and Style Steering
+
+- **Token Cage Completion**  
+  Gradually increase penalty outside a targeted phrase to encourage convergence without forcing it explicitly.
+
+- **Rolling Redundancy Avoidance**  
+  Penalize tokens that would repeat recent bigrams or trigrams to prevent looping or verbose filler.
+
+- **Mid-Stream Persona Shifting**  
+  Change behavioral tone or domain vector mid-output based on context or external signal (e.g., from a UI toggle or control code).
+
+- **Token-Time Awareness**  
+  Adjust generation pacing or tone based on the real-time duration of inference, useful for responsive UIs.
+
+- **Interrupt-Aware Smoothing**  
+  When running in streamed environments, steer generation toward natural stopping points in anticipation of possible interruption.
+
+### 🔧 Meta-Control Extensions
+
+- **User-Controlled Persona Blending**  
+  Dynamically compose behavior vectors (e.g., 40% safety + 30% helpfulness + 30% brevity) via UI or API input.
+
+- **Adaptive Penalty Switching**  
+  Replace or blend sidekick models or penalty overlays at runtime in response to detected dialogue phases or external events.
