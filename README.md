@@ -190,31 +190,33 @@ A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM
 
 ```mermaid
 flowchart TD
-  A[Token History + Prompt] --> B[Main LLM\n(GPU)]
-  A --> C[BearMuzzle Sidekick\n(CPU)]
-  B --> D[Raw Logits]
-  C --> E[Logit Adjustments\n(bias / mask / injection)]
-  D --> F[Adjusted Logits]
+  A[Token History + Prompt]
+  B[Main LLM\n(GPU)]
+  C[BearMuzzle Sidekick\n(CPU)]
+  D[Raw Logits]
+  E[Logit Adjustments\n(bias / mask / injection)]
+  F[Adjusted Logits]
+  G{Token Sampling\n(Next Token)}
+  H[Output Buffer]
+  I[Insert Forced Phrase]
+  J[Mark Position for\nLater Removal]
+
+  A --> B
+  A --> C
+  B --> D
+  C --> E
+  D --> F
   E --> F
-  F --> G{Token Sampling\n(Next Token)}
-  G --> H[Output Buffer]
-
-  subgraph Optional Injection
-    I[Insert Forced Phrase] --> J[Mark Position for\nLater Removal]
-  end
-
+  F --> G
+  G --> H
   G --> I
+  I --> J
   J --> H
 
-  style B fill:#fdf6e3,stroke:#b58900,stroke-width:2px
-  style C fill:#e6f7ff,stroke:#268bd2,stroke-width:2px
-  style D fill:#eee
-  style E fill:#eee
-  style F fill:#eee
-  style G fill:#fff,stroke:#999,stroke-width:1px
-  style H fill:#d7ffd7,stroke:#2e7d32,stroke-width:2px
-  style I fill:#fce4ec,stroke:#ad1457,stroke-dasharray: 5 5
-  style J fill:#fce4ec,stroke:#ad1457,stroke-dasharray: 5 5
+  subgraph Optional Injection
+    I
+    J
+  end
 ```
 This visual captures the flow between the two models and how logit guidance is applied.
 
