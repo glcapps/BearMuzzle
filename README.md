@@ -932,3 +932,61 @@ This process aligns conceptually with BearMuzzle’s correction approach:
 - Provides an opportunity to benchmark correction accuracy vs. speculative draft acceptance rates.
 
 This enhances BearMuzzle’s conceptual grounding and connects it to active work in efficient LLM inference.
+---
+
+## 🧠 Bracketed Reasoning and Deliberate Planning via Sidekick Guidance
+
+BearMuzzle enables structured reasoning behavior in LLMs through indirect control of token flow — even in the absence of agent-native capabilities like function calling or intermediate steps.
+
+By shaping the likelihood of reasoning-related tokens (e.g., `<think>`, `</think>`, `Answer:`), the sidekick model can enforce boundaries and rhythms in the model's thought process.
+
+### 🧩 Key Patterns Enabled
+
+#### 1. **Encouraging a Thinking Block Start**
+
+If the model begins responding without deliberation, BearMuzzle can:
+- Detect the lack of a `<think>` block.
+- Strongly bias the emission of a `<think>` token.
+- Suppress direct answer phrases (`Answer:`) until reasoning has occurred.
+
+> 📌 Outcome: Improves planning and discourages impulsive responses.
+
+#### 2. **Ending a Reasoning Phase**
+
+BearMuzzle can nudge the model to:
+- Emit `</think>` after sufficient tokens or heuristic cues (e.g., repetition or tautologies).
+- Transition naturally into an answer or action phase.
+
+> 📌 Outcome: Prevents runaway reasoning, keeps outputs efficient and bounded.
+
+#### 3. **Reopening Thought After Tool Use**
+
+If the LLM uses a tool (e.g., database lookup or calculator), BearMuzzle can:
+- Detect tool result lines.
+- Enforce a second `<think>` block before finalizing the answer.
+
+> 📌 Outcome: Encourages multi-phase reasoning in complex workflows.
+
+#### 4. **Bracketing via Forced Tokens with Cleanup**
+
+When paired with BearMuzzle's post-inference cleanup layer:
+- Forced `<think>...</think>` blocks can be inserted inline.
+- These spans can be stripped before final output.
+- Or retained for auditability.
+
+> 📌 Outcome: Enables verbose internal reasoning while keeping clean UI results.
+
+### 🔧 Runtime Implementation
+
+- Token selection adjusted by sidekick during inference loop.
+- LLM output remains uninterrupted, preserving native autoregressive flow.
+- Thinking regions are tracked for optional trimming or scoring.
+
+### 🛠️ Advanced Use Cases
+
+- Chain-of-thought QA
+- Agent-style planning in a flat stream
+- Code analysis with multi-step justification
+- Policy recommendation systems that think aloud
+
+This structure allows BearMuzzle to simulate "thinking" behavior in local models, making the output more explainable, structured, and aligned with advanced prompting strategies.
