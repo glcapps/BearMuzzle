@@ -1,3 +1,37 @@
+## 🧠 Deterministic Expert Routing via Token Markers
+
+### 🧠 Deterministic Expert Routing via Token Markers
+
+The BearMuzzle sidekick model can be structured as a Mixture of Experts (MoE) model where each expert specializes in a specific task, such as reasoning, linting, planning, or neutral token handling. Instead of relying on a learned gating mechanism, expert routing can be **deterministically controlled** based on token markers emitted by the main LLM.
+
+For example:
+- `[THINK_START]` can activate the "Reasoning" expert.
+- `[COMMENT]` can activate a "Linter" expert.
+- `[PLAN_BEGIN]` can activate a "Planner" expert.
+
+This deterministic approach eliminates the overhead of a learned gating network, allowing consistent, reproducible expert routing at runtime with minimal latency.
+
+#### 🛠 Implementation Strategy in `llama.cpp`
+
+The `llama.cpp` engine supports LMoE (Mixture of Experts) models with runtime expert routing. By modifying the expert gating logic within the inference loop (e.g., inside `llama_sample_softmax()` or related gating paths), you can inject routing logic like:
+
+```cpp
+if (current_mode == REASONING) {
+    gate[expert_reasoning] = 1.0f;
+    gate[others] = 0.0f;
+}
+```
+
+The `current_mode` can be determined by parsing the token stream from the main LLM during inference.
+
+#### ✅ Advantages
+- No latency from model swapping
+- Experts remain in memory (no reloads)
+- Clear symbolic alignment with LLM output
+- Easily extensible by adding new expert modules
+
+This technique makes it possible to build real-time, structure-aware sidekick models that operate predictably alongside the main LLM during streaming inference.
+
 
 
 A lightweight CPU-side model that dynamically adjusts the logits of a larger LLM during inference — for real-time steering, behavioral shaping, or stylistic control without modifying the base model.
